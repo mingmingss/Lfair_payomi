@@ -16,7 +16,7 @@ class CustomStyle:
             'warning': '#FFC107',  # Yellow
             'danger': '#F44336',  # Red
             'light': '#F5F5F5',  # Light Gray
-            'dark': '#ffffff',  # Dark Gray
+            'dark': '#000000',  # Dark Gray
             'white': '#FFFFFF',
             'background': '#F0F2F5'  # Light blue-gray
         }
@@ -36,7 +36,7 @@ class CustomStyle:
 
         # Configure medinote styles
         style.configure('Main.TFrame', background=self.colors['background'])
-        style.configure('Card.TFrame', background=self.colors['white'])
+        style.configure('Card.TFrame', background=self.colors['dark'])
 
         # Button styles
         style.configure('Primary.TButton',
@@ -83,15 +83,12 @@ class UserInfoDialog:
         self.create_widgets()
 
     def create_widgets(self):
-        # Main container with padding and background
         main_frame = ttk.Frame(self.window, style='Main.TFrame', padding="30")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Card-like container
         card_frame = ttk.Frame(main_frame, style='Card.TFrame', padding="20")
         card_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Title with icon-like emoji
         title_text = "👤 사용자 정보"
         ttk.Label(card_frame,
                   text=title_text,
