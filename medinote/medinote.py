@@ -34,7 +34,7 @@ class CustomStyle:
     def apply_style(self):
         style = ttk.Style()
 
-        # Configure main styles
+        # Configure medinote styles
         style.configure('Main.TFrame', background=self.colors['background'])
         style.configure('Card.TFrame', background=self.colors['white'])
 
@@ -315,8 +315,8 @@ class MedicationBanner(ttk.Frame):
 
     def change_time(self):
         time_window = tk.Toplevel(self)
-        time_window.title("복용 시간 변경")
-        time_window.geometry("400x500")
+        time_window.title("복용 시간 설정")
+        time_window.geometry("400x550")
         time_window.configure(bg=self.style.colors['background'])
 
         # Card-like container
@@ -328,21 +328,34 @@ class MedicationBanner(ttk.Frame):
                   text="⏰ 복용 시간 설정",
                   style='Title.TLabel').pack(pady=(0, 20))
 
-        # Time input
+        # Enable/Disable notifications
+        notifications_var = tk.BooleanVar(value=pd.notna(self.medication_data['Notification Time']))
+        notifications_check = ttk.Checkbutton(
+            card_frame,
+            text="알림 설정",
+            variable=notifications_var,
+            style='Primary.TCheckbutton'
+        )
+        notifications_check.pack(pady=(0, 10))
+
+        # Time input frame
         time_frame = ttk.Frame(card_frame, style='Card.TFrame')
         time_frame.pack(fill=tk.X, pady=10)
 
         ttk.Label(time_frame,
                   text="복용 시간:",
                   style='Body.TLabel').pack()
-        time_entry = ttk.Entry(time_frame,
-                               font=self.style.fonts['body'])
+        time_entry = ttk.Entry(time_frame, font=self.style.fonts['body'])
         time_entry.pack(pady=5)
-        time_entry.insert(0, self.medication_data['Notification Time'])
+
+        # 기존 시간이 있으면 입력
+        if pd.notna(self.medication_data['Notification Time']):
+            time_entry.insert(0, self.medication_data['Notification Time'])
 
         ttk.Label(time_frame,
-                  text="형식: HH:MM (예: 09:00)",
-                  style='Body.TLabel').pack()
+                  text="형식: HH:MM (예: 09:00)\n알림을 받지 않으려면 비워두세요",
+                  style='Body.TLabel',
+                  justify='center').pack()
 
         # Condition selection
         condition_frame = ttk.Frame(card_frame, style='Card.TFrame')
@@ -352,7 +365,8 @@ class MedicationBanner(ttk.Frame):
                   text="복용 조건:",
                   style='Body.TLabel').pack()
 
-        condition_var = tk.StringVar(value=self.medication_data.get('Taking_Condition', '식후'))
+        current_condition = self.medication_data.get('Taking_Condition', '식후')
+        condition_var = tk.StringVar(value=current_condition)
 
         conditions = {
             '식전': '식사하기 30분 전에 복용하세요.',
@@ -365,11 +379,12 @@ class MedicationBanner(ttk.Frame):
                             text=condition,
                             variable=condition_var,
                             value=condition).pack(padx=5, pady=5)
+
+        # Explanation label
         explanation_label = ttk.Label(card_frame,
-                                      text=conditions[condition_var.get()],
+                                      text=conditions[current_condition],
                                       style='Body.TLabel',
-                                      wraplength=350,
-                                      justify='left')
+                                      wraplength=350)
         explanation_label.pack(pady=10)
 
         def update_explanation(*args):
@@ -379,22 +394,35 @@ class MedicationBanner(ttk.Frame):
 
         condition_var.trace('w', update_explanation)
 
-        # Save button
         def save_new_time():
-            time_str = time_entry.get()
-            try:
-                datetime.strptime(time_str, "%H:%M")
-                self.manager.update_medication(
-                    self.medication_data['Product Name'],
-                    {
-                        'Notification Time': time_str,
-                        'Taking_Condition': condition_var.get()
-                    }
-                )
-                time_window.destroy()
-                messagebox.showinfo("성공", "복용 시간이 변경되었습니다.")
-            except ValueError:
-                messagebox.showerror("오류", "올바른 시간 형식을 입력하세요 (HH:MM)")
+            time_str = time_entry.get().strip()
+            notifications_enabled = notifications_var.get()
+
+            if time_str:  # 시간이 입력된 경우
+                try:
+                    datetime.strptime(time_str, "%H:%M")
+                except ValueError:
+                    messagebox.showerror("오류", "올바른 시간 형식을 입력하세요 (HH:MM)")
+                    return
+            else:  # 시간이 입력되지 않은 경우
+                time_str = None
+
+            updates = {
+                'Notification Time': time_str,
+                'Taking_Condition': condition_var.get(),
+                'Notifications_Enabled': notifications_enabled
+            }
+
+            self.manager.update_medication(
+                self.medication_data['Product Name'],
+                updates
+            )
+
+            time_window.destroy()
+            success_msg = "복용 설정이 변경되었습니다."
+            if not time_str:
+                success_msg += "\n알림 시간이 설정되지 않았습니다."
+            messagebox.showinfo("성공", success_msg)
 
         ttk.Button(card_frame,
                    text="✔️ 저장",
@@ -544,7 +572,7 @@ class MedicationManager:
                                   anchor="nw",
                                   width=self.canvas.winfo_width())
 
-        # Update canvas width when main frame is resized
+        # Update canvas width when medinote frame is resized
         def on_frame_configure(event):
             canvas_width = event.width - scrollbar.winfo_width()
             self.canvas.itemconfig(1, width=canvas_width)
@@ -847,8 +875,7 @@ class MedicationManager:
                            style='Primary.TButton',
                            command=notif_window.destroy).pack()
 
-        # Check again in 10 seconds
-        self.root.after(10000, self.check_notifications)
+        self.root.after(60000, self.check_notifications)
 
         def edit_user_info(self):
             dialog = UserInfoDialog(self.root)
@@ -869,7 +896,7 @@ class MedicationManager:
                 with open('user_info.json', 'w', encoding='utf-8') as f:
                     json.dump(self.user_info, f, ensure_ascii=False, indent=2)
 
-                # Refresh main screen
+                # Refresh medinote screen
                 self.main_frame.destroy()
                 self.create_main_screen()
 
